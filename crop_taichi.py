@@ -34,8 +34,6 @@ def check_camera_motion(current_frame, previous_frame):
 
 def store(video_path, trajectories, end, args):
     for i, (initial_bbox, tube_bbox, start, frame_list) in enumerate(trajectories):
-        if len(frame_list) >= 32:
-            print (initial_bbox, tube_bbox, start)
         out = crop_bbox_from_frames(frame_list, tube_bbox, min_frames=args.min_frames, image_shape=args.image_shape,
                                     min_size=args.min_size, increase_area=args.increase)
         if out is None:
@@ -86,13 +84,14 @@ def process_video(video_path, detector, args):
             criterion = np.logical_and(full_person_criterion, criterion)
             bboxes_valid = bboxes.numpy()[criterion]
 
-
             ### Check if frame is valid
             if previous_frame is None:
-                previous_frame = rgb2gray(resize(frame, (256, 256), preserve_range=True, anti_aliasing=True))
+                previous_frame = rgb2gray(
+                    resize(frame, (256, 256), preserve_range=True, anti_aliasing=True, mode='constant'))
                 current_frame = previous_frame
             else:
-                current_frame = rgb2gray(resize(frame, (256, 256), preserve_range=True, anti_aliasing=True))
+                current_frame = rgb2gray(
+                    resize(frame, (256, 256), preserve_range=True, anti_aliasing=True, mode='constant'))
             flow_quantiles = check_camera_motion(current_frame, previous_frame)
             anotations['flow_quantiles'].append(flow_quantiles[np.newaxis])
             camera_criterion = flow_quantiles[1] > args.camera_change_threshold
@@ -156,7 +155,6 @@ def process_video(video_path, detector, args):
                         trajectory[3].append(frame)
                         break
 
-
                 ## Create new trajectory
                 if not intersect:
                     trajectories.append([bbox, bbox, i, [frame]])
@@ -204,8 +202,8 @@ if __name__ == "__main__":
                         default="/home/gin/maskrcnn-benchmark/configs/caffe2/e2e_keypoint_rcnn_R_50_FPN_1x_caffe2.yaml",
                         help="Path to keypoints config for mask rcnn")
 
-    parser.add_argument("--mimial_person_size", default=0.20, type=float,
-                        help="Minimal person size, e.g 25% of height")
+    parser.add_argument("--mimial_person_size", default=0.10, type=float,
+                        help="Minimal person size, e.g 10% of height")
 
     parser.add_argument("--minimal_video_size", default=300, type=int, help="Minimal size of the video")
 
