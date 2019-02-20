@@ -9,6 +9,7 @@ import subprocess
 from multiprocessing import Process
 import warnings
 import glob
+import time
 
 warnings.filterwarnings("ignore")
 
@@ -46,7 +47,11 @@ def extract_bbox(frame, refbbox, fa):
 
 def store(frame_list, video_count, tube_bbox, person_id, video_id, utterance):
     if len(frame_list) < args.min_frames:
+<<<<<<< HEAD
         return 0
+=======
+        return
+>>>>>>> 752bf11ad2e3cf79551ebe339e4599e8c59c522a
     left, top, right, bot, _ = tube_bbox
     width = right - left
     height = bot - top
@@ -58,6 +63,13 @@ def store(frame_list, video_count, tube_bbox, person_id, video_id, utterance):
     top = max(0, top - height_inc * height)
     right = right + width_inc * width
     bot = bot + height_inc * height
+======
+        return
+    left = max(0, left - args.increase * width)
+    top = max(0, top - args.increase * height)
+    right = right + args.increase * width
+    bot = bot + args.increase * height
+>>>>>>> 752bf11ad2e3cf79551ebe339e4599e8c59c522a
     out = [img_as_ubyte(resize(frame[int(top):int(bot), int(left):int(right)], args.image_shape)) for frame in
            frame_list]
 
@@ -87,6 +99,7 @@ def estimate_bbox(person_id, video_id, video_path, fa):
     d = pd.read_csv(utterance, sep='\t', skiprows=6)
     frames = d['FRAME ']
 
+<<<<<<< HEAD
     try:
         #if len(reader) != len(frames):
         #    print("Warning len video %s, len utterance %s" % (len(reader), len(frames)))
@@ -100,6 +113,16 @@ def estimate_bbox(person_id, video_id, video_path, fa):
             bbox_list.append(bbox)
     except RuntimeError:
         None
+=======
+    for i, frame in enumerate(reader):
+        if i >= len(frames):
+            break
+        val = d.iloc[i]
+        mult = frame.shape[0] / REF_FRAME_SIZE
+        x, y, w, h = val['X '] * mult, val['Y '] * mult, val['W '] * mult, val['H '] * mult
+        bbox = extract_bbox(frame, (x, y, x + w, y + h), fa)
+        bbox_list.append(bbox)
+>>>>>>> 752bf11ad2e3cf79551ebe339e4599e8c59c522a
 
     save_bbox_list(video_path, bbox_list)
 
@@ -114,6 +137,7 @@ def crop_video(person_id, video_id, video_path):
     initial_bbox = None
     tube_bbox = None
     frame_list = []
+<<<<<<< HEAD
     
     low_res = 0
     try:
@@ -135,6 +159,25 @@ def crop_video(person_id, video_id, video_path):
             frame_list.append(frame)
     except RuntimeError:
         None
+=======
+
+    for i, frame in enumerate(reader):
+        bbox = np.array(d.iloc[i])
+
+        if initial_bbox is None:
+            initial_bbox = bbox
+            tube_bbox = bbox
+
+        if bb_intersection_over_union(initial_bbox, bbox) < args.iou_with_initial or len(
+                frame_list) >= args.max_frames:
+            store(frame_list, video_count, tube_bbox, person_id, video_id, utterance)
+            video_count += 1
+            initial_bbox = bbox
+            tube_bbox = bbox
+            frame_list = []
+        tube_bbox = join(tube_bbox, bbox)
+        frame_list.append(frame)
+>>>>>>> 752bf11ad2e3cf79551ebe339e4599e8c59c522a
 
     store(frame_list, video_count, tube_bbox, person_id, video_id, utterance)
 
@@ -206,8 +249,22 @@ def main(min_id, max_id, cuda='0'):
                 if args.estimate_bbox:
                     path = os.path.join(args.chunk_folder, video_id + '*.mp4')
                     for chunk in glob.glob(path):
+<<<<<<< HEAD
                         estimate_bbox(person_id, video_id, chunk, fa)
 
+=======
+                        while True:
+                            try:
+                                estimate_bbox(person_id, video_id, chunk, fa)
+                                break
+                            except RuntimeError as e:
+                                if str(e).startswith('CUDA'):
+                                   print ("Warning: out of memory, sleep for 1s")
+                                   time.sleep(1)
+                                else:
+                                   print (e)
+                                   break                          
+>>>>>>> 752bf11ad2e3cf79551ebe339e4599e8c59c522a
                 if args.crop:
                     path = os.path.join(args.chunk_folder, video_id + '*.mp4')
                     for chunk in glob.glob(path):
@@ -218,8 +275,13 @@ def main(min_id, max_id, cuda='0'):
                         if os.path.exists(file):
                             os.remove(file)
 
+<<<<<<< HEAD
             except RuntimeError as e:
                 print(e)
+=======
+            except Exception as e:
+                print("Error: %s, skipping and continue." % str(s))
+>>>>>>> 752bf11ad2e3cf79551ebe339e4599e8c59c522a
 
 
 if __name__ == "__main__":
@@ -231,9 +293,15 @@ if __name__ == "__main__":
     parser.add_argument("--increase", default=0.1, type=float, help='Increase bbox by this amount')
     parser.add_argument("--min_frames", default=5, type=int, help='Mimimal number of frames')
     parser.add_argument("--max_frames", default=100, type=int, help='Maximal number of frames')
+<<<<<<< HEAD
     parser.add_argument("--min_size", default=200, type=int, help='Minimal allowed size')
 
     parser.add_argument("--annotations_folder", default='txt1', help='Path to utterance annotations')
+=======
+    parser.add_argument("--min_size", default=64, type=int, help='Minimal allowed size')
+
+    parser.add_argument("--annotations_folder", default='txt', help='Path to utterance annotations')
+>>>>>>> 752bf11ad2e3cf79551ebe339e4599e8c59c522a
 
     parser.add_argument("--video_folder", default='videos', help='Path to intermediate videos')
     parser.add_argument("--chunk_folder", default='chunks', help="Path to folder with video chunks")
@@ -252,7 +320,11 @@ if __name__ == "__main__":
                         help="Do not estimate the bboxes")
     parser.add_argument("--no-crop", dest="crop", action="store_false", help="Do not crop the videos")
 
+<<<<<<< HEAD
     parser.add_argument("--remove-intermediate-results", dest="remove_intermediate_results", action="store_true", help="Do not crop the videos")
+=======
+    parser.add_argument("--remove-intermediate-results", dest="remove_intermediate_results", action="store_true", help="Remove intermediate videos")
+>>>>>>> 752bf11ad2e3cf79551ebe339e4599e8c59c522a
 
     parser.set_defaults(download=True)
     parser.set_defaults(split_in_utterance=True)
@@ -276,7 +348,11 @@ if __name__ == "__main__":
 
     ids = sorted(os.listdir(args.annotations_folder))
     minimum, maximum = int(ids[0][2:]), int(ids[-1][2:])
+<<<<<<< HEAD
     ln = (maximum - minimum) // args.workers + 1
+=======
+    ln = (maximum - minimum + 1) // args.workers
+>>>>>>> 752bf11ad2e3cf79551ebe339e4599e8c59c522a
     device_ind = 0
     processes = []
     for begin in range(minimum, maximum + 1, ln):
