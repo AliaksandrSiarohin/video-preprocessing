@@ -32,15 +32,19 @@ def check_camera_motion(current_frame, previous_frame):
     return np.quantile(mag, [0.25, 0.5, 0.75], overwrite_input=True)
 
 
-def store(video_path, trajectories, end, args):
+def store(video_path, trajectories, end, args, video_counter):
     for i, (initial_bbox, tube_bbox, start, frame_list) in enumerate(trajectories):
         out = crop_bbox_from_frames(frame_list, tube_bbox, min_frames=args.min_frames, image_shape=args.image_shape,
                                     min_size=args.min_size, increase_area=args.increase)
+        if video_counter > args.max_crops:
+            return video_counter
         if out is None:
             continue
-        name = os.path.basename(video_path) + "#" + str(i).zfill(3) + "#" + str(start).zfill(6) + "#" + str(end).zfill(
-            6) + ".mp4"
-        imageio.mimsave(os.path.join(args.out_folder, name), out)
+        name = (os.path.basename(video_path) + "#" + str(video_counter).zfill(3) + "#"
+                + str(start).zfill(6) + "#" + str(end).zfill(6) + ".mp4")
+        imageio.mimsave(os.path.join(args.out_folder, name), out, fps=25)
+        video_counter += 1
+    return video_counter
 
 
 def process_video(video_path, detector, args):
@@ -55,6 +59,7 @@ def process_video(video_path, detector, args):
 
     trajectories = []
     previous_frame = None
+    video_counter = 0
     try:
         for i, frame in enumerate(video):
             if args.minimal_video_size > min(frame.shape[0], frame.shape[1]):
@@ -102,7 +107,7 @@ def process_video(video_path, detector, args):
             criterion = no_person_criterion or camera_criterion
 
             if criterion:
-                store(video_path, trajectories, i, args)
+                video_counter = store(video_path, trajectories, i, args, video_counter)
                 trajectories = []
 
             ## For each trajectory check the criterion
@@ -141,7 +146,7 @@ def process_video(video_path, detector, args):
 
                 valid_trajectories.append(trajectory)
 
-            store(video_path, not_valid_trajectories, i, args)
+            video_counter = store(video_path, not_valid_trajectories, i, args, video_counter)
             trajectories = valid_trajectories
 
             ## Assign bbox to trajectories, create new trajectories
@@ -159,7 +164,10 @@ def process_video(video_path, detector, args):
                 if not intersect:
                     trajectories.append([bbox, bbox, i, [frame]])
 
-    except imageio.core.format.CannotReadFrameError:
+            if video_counter > args.max_crops:
+                break
+
+    except IndexError:
         None
 
     anotations = {k: np.array(v) for k, v in anotations.items()}
@@ -209,6 +217,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--camera_change_threshold", type=float, default=1)
     parser.add_argument("--sample_rate", type=int, default=5, help="Sample video rate")
+    parser.add_argument("--max_crops", type=int, default=20, help="Maximal number of crops per video.")
 
     args = parser.parse_args()
 
