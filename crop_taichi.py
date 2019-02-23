@@ -34,7 +34,7 @@ def check_camera_motion(current_frame, previous_frame):
 
 def store(video_path, trajectories, end, args, chunks_data, fps):
     for i, (initial_bbox, tube_bbox, start, frame_list) in enumerate(trajectories):
-        out = crop_bbox_from_frames(frame_list, tube_bbox, min_frames=args.min_frames, image_shape=args.image_shape,
+        out, final_bbox = crop_bbox_from_frames(frame_list, tube_bbox, min_frames=args.min_frames, image_shape=args.image_shape,
                                     min_size=args.min_size, increase_area=args.increase, max_pad=args.max_pad)
         if len(chunks_data) > args.max_crops:
             return
@@ -43,8 +43,8 @@ def store(video_path, trajectories, end, args, chunks_data, fps):
         name = (os.path.basename(video_path) + "#" + str(len(chunks_data)).zfill(3) + "#"
                 + str(start).zfill(6) + "#" + str(end).zfill(6) + ".mp4")
         imageio.mimsave(os.path.join(args.out_folder, name), out, fps=25)
-        chunks_data.append({'bbox': '-'.join(map(str, final_bbox)), 'start': start, 'end': end, 'fps': fps, 'video_path': video_path,
-                            'height': frame_list[0].shape[0], 'width': frame_list[0].shape[1]})
+        chunks_data.append({'bbox': '-'.join(map(str, final_bbox)), 'start': start, 'end': end, 'fps': fps,
+                            'video_path': video_path, 'height': frame_list[0].shape[0], 'width': frame_list[0].shape[1]})
 
 
 def process_video(video_path, detector, args):
@@ -221,6 +221,7 @@ if __name__ == "__main__":
     parser.add_argument("--camera_change_threshold", type=float, default=1)
     parser.add_argument("--sample_rate", type=int, default=5, help="Sample video rate")
     parser.add_argument("--max_crops", type=int, default=20, help="Maximal number of crops per video.")
+    parser.add_argument("--chunks_metadata", default='taichi-metadata.csv', help="File to store metadata for taichi.")
 
     args = parser.parse_args()
 

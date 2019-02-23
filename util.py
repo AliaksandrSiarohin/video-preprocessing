@@ -72,7 +72,7 @@ def crop_bbox_from_frames(frame_list, tube_bbox, min_frames=16, image_shape=(256
     selected = [frame[top:bot, left:right] for frame in padded]
     out = [img_as_ubyte(resize(frame, image_shape, anti_aliasing=True)) for frame in selected]
 
-    return out
+    return out, [left, top, right, bot]
 
 from multiprocessing import Pool
 from itertools import cycle
@@ -85,7 +85,9 @@ def scheduler(data_list, fn, args):
     args_list = cycle([args])
     f = open(args.chunks_metadata, 'w')
     line = "{video_path}, {begin}, {end}, {bbox}, {fps}, {width}, {height}"
-    print (line.replace('{', '').replace('}', '') file=f)
+    print (line.replace('{', '').replace('}', ''), file=f)
     for chunks_data in tqdm(pool.imap_unordered(fn, zip(data_list, cycle(device_ids), args_list))):
         for data in chunks_data:
             print (line % data, file=f)
+            f.flush()
+    f.close()
