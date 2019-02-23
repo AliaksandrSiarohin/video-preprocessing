@@ -32,23 +32,24 @@ def check_camera_motion(current_frame, previous_frame):
     return np.quantile(mag, [0.25, 0.5, 0.75], overwrite_input=True)
 
 
-def store(video_path, trajectories, end, args, video_counter):
+def store(video_path, trajectories, end, args, chunks_data, fps):
     for i, (initial_bbox, tube_bbox, start, frame_list) in enumerate(trajectories):
         out = crop_bbox_from_frames(frame_list, tube_bbox, min_frames=args.min_frames, image_shape=args.image_shape,
-                                    min_size=args.min_size, increase_area=args.increase)
-        if video_counter > args.max_crops:
-            return video_counter
+                                    min_size=args.min_size, increase_area=args.increase, max_pad=args.max_pad)
+        if len(chunks_data) > args.max_crops:
+            return
         if out is None:
             continue
-        name = (os.path.basename(video_path) + "#" + str(video_counter).zfill(3) + "#"
+        name = (os.path.basename(video_path) + "#" + str(len(chunks_data)).zfill(3) + "#"
                 + str(start).zfill(6) + "#" + str(end).zfill(6) + ".mp4")
         imageio.mimsave(os.path.join(args.out_folder, name), out, fps=25)
-        video_counter += 1
-    return video_counter
+        chunks_data.append({'bbox': '-'.join(map(str, final_bbox)), 'start': start, 'end': end, 'fps': fps, 'video_path': video_path,
+                            'height': frame_list[0].shape[0], 'width': frame_list[0].shape[1]})
 
 
 def process_video(video_path, detector, args):
     video = imageio.get_reader(video_path)
+    fps = video.get_metadata()['fps']
 
     anotations = {"keypoints": [],
                   "scores": [],
@@ -59,7 +60,7 @@ def process_video(video_path, detector, args):
 
     trajectories = []
     previous_frame = None
-    video_counter = 0
+    chunks_data = []
     try:
         for i, frame in enumerate(video):
             if args.minimal_video_size > min(frame.shape[0], frame.shape[1]):
@@ -107,7 +108,7 @@ def process_video(video_path, detector, args):
             criterion = no_person_criterion or camera_criterion
 
             if criterion:
-                video_counter = store(video_path, trajectories, i, args, video_counter)
+                video_counter = store(video_path, trajectories, i, args, chunks_data, fps)
                 trajectories = []
 
             ## For each trajectory check the criterion
@@ -146,7 +147,7 @@ def process_video(video_path, detector, args):
 
                 valid_trajectories.append(trajectory)
 
-            video_counter = store(video_path, not_valid_trajectories, i, args, video_counter)
+            video_counter = store(video_path, not_valid_trajectories, i, args, chunks_data, fps)
             trajectories = valid_trajectories
 
             ## Assign bbox to trajectories, create new trajectories
@@ -172,8 +173,8 @@ def process_video(video_path, detector, args):
 
     anotations = {k: np.array(v) for k, v in anotations.items()}
     np.savez(os.path.join(args.annotation_folder, os.path.basename(video_path)[:-3] + 'npz'), **anotations)
-    store(video_path, trajectories, i + 1, args)
-
+    store(video_path, trajectories, i + 1, args, chunks_data, fps)
+    return chunks_data
 
 def run(params):
     video_file, device_id, args = params
@@ -199,7 +200,9 @@ if __name__ == "__main__":
     parser.add_argument("--increase", default=0, type=float, help='Increase bbox by this amount')
     parser.add_argument("--min_frames", default=32, type=int, help='Mimimal number of frames')
     parser.add_argument("--max_frames", default=128, type=int, help='Maximal number of frames')
-    parser.add_argument("--min_size", default=200, type=int, help='Minimal allowed size')
+    parser.add_argument("--min_size", default=256, type=int, help='Minimal allowed size')
+    parser.add_argument("--max_pad", default=0, type=int, help='Minimal allowed padding')
+
 
     parser.add_argument("--out_folder", default="taichi-256", help="Folder with output videos")
     parser.add_argument("--annotation_folder", default="taichi-annotations", help="Folder for annotations")

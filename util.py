@@ -39,7 +39,7 @@ def compute_aspect_preserved_bbox(bbox, increase_area):
     return (left, top, right, bot)
 
 def crop_bbox_from_frames(frame_list, tube_bbox, min_frames=16, image_shape=(256, 256), min_size=200,
-                          increase_area=0.1):
+                          increase_area=0.1, max_pad=10):
     frame_shape = frame_list[0].shape
     # Filter short sequences
     if len(frame_list) < min_frames:
@@ -64,6 +64,9 @@ def crop_bbox_from_frames(frame_list, tube_bbox, min_frames=16, image_shape=(256
     top += top_oob
     bot += top_oob
 
+    if max(left_oob, right_oob, top_oob, bot_oob) > max_pad:
+        return None
+
     padded = [np.pad(frame, pad_width=((top_oob, bot_oob), (left_oob, right_oob), (0, 0)),
                      mode='constant', constant_values=255) for frame in frame_list]
     selected = [frame[top:bot, left:right] for frame in padded]
@@ -80,5 +83,9 @@ def scheduler(data_list, fn, args):
     device_ids = args.device_ids.split(",")
     pool = Pool(processes=args.workers)
     args_list = cycle([args])
-    for _ in tqdm(enumerate(pool.imap_unordered(fn, zip(data_list, cycle(device_ids), args_list)))):
-        None
+    f = open(args.chunks_metadata, 'w')
+    line = "{video_path}, {begin}, {end}, {bbox}, {fps}, {width}, {height}"
+    print (line.replace('{', '').replace('}', '') file=f)
+    for chunks_data in tqdm(pool.imap_unordered(fn, zip(data_list, cycle(device_ids), args_list))):
+        for data in chunks_data:
+            print (line % data, file=f)
