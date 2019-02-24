@@ -43,13 +43,13 @@ def crop_bbox_from_frames(frame_list, tube_bbox, min_frames=16, image_shape=(256
     frame_shape = frame_list[0].shape
     # Filter short sequences
     if len(frame_list) < min_frames:
-        return None
+        return None, None
     left, top, right, bot = tube_bbox
     width = right - left
     height = bot - top
     # Filter if it is too small
     if max(width, height) < min_size:
-        return None
+        return None, None
 
     left, top, right, bot = compute_aspect_preserved_bbox(tube_bbox, increase_area)
 
@@ -58,18 +58,17 @@ def crop_bbox_from_frames(frame_list, tube_bbox, min_frames=16, image_shape=(256
     right_oob = right - min(right, frame_shape[1])
     top_oob = -min(0, top)
     bot_oob = bot - min(bot, frame_shape[0])
-
+    
     left += left_oob
     right += left_oob
     top += top_oob
     bot += top_oob
 
-    if max(left_oob, right_oob, top_oob, bot_oob) > max_pad:
-        return None
-
-    padded = [np.pad(frame, pad_width=((top_oob, bot_oob), (left_oob, right_oob), (0, 0)),
-                     mode='constant', constant_values=255) for frame in frame_list]
-    selected = [frame[top:bot, left:right] for frame in padded]
+    #Not use near the border
+    if max(left_oob / float(width), right_oob / float(width), top_oob  / float(height), bot_oob / float(height)) > max_pad:
+        return None, None
+ 
+    selected = [frame[top:bot, left:right] for frame in frame_list]
     out = [img_as_ubyte(resize(frame, image_shape, anti_aliasing=True)) for frame in selected]
 
     return out, [left, top, right, bot]
@@ -84,10 +83,10 @@ def scheduler(data_list, fn, args):
     pool = Pool(processes=args.workers)
     args_list = cycle([args])
     f = open(args.chunks_metadata, 'w')
-    line = "{video_path}, {begin}, {end}, {bbox}, {fps}, {width}, {height}"
+    line = "{video_id},{start},{end},{bbox},{fps},{width},{height}"
     print (line.replace('{', '').replace('}', ''), file=f)
     for chunks_data in tqdm(pool.imap_unordered(fn, zip(data_list, cycle(device_ids), args_list))):
         for data in chunks_data:
-            print (line % data, file=f)
+            print (line.format(**data), file=f)
             f.flush()
     f.close()

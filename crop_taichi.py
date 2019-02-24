@@ -40,17 +40,17 @@ def store(video_path, trajectories, end, args, chunks_data, fps):
             return
         if out is None:
             continue
-        name = (os.path.basename(video_path) + "#" + str(len(chunks_data)).zfill(3) + "#"
+        video_id = os.path.basename(video_path).split('.')[0]
+        name = (video_id + "#" + str(len(chunks_data)).zfill(3) + "#"
                 + str(start).zfill(6) + "#" + str(end).zfill(6) + ".mp4")
         imageio.mimsave(os.path.join(args.out_folder, name), out, fps=25)
         chunks_data.append({'bbox': '-'.join(map(str, final_bbox)), 'start': start, 'end': end, 'fps': fps,
-                            'video_path': video_path, 'height': frame_list[0].shape[0], 'width': frame_list[0].shape[1]})
+                            'video_id': video_id, 'height': frame_list[0].shape[0], 'width': frame_list[0].shape[1]})
 
 
 def process_video(video_path, detector, args):
     video = imageio.get_reader(video_path)
-    fps = video.get_metadata()['fps']
-
+    fps = video.get_meta_data()['fps']
     anotations = {"keypoints": [],
                   "scores": [],
                   "keypoint_scores": [],
@@ -64,7 +64,7 @@ def process_video(video_path, detector, args):
     try:
         for i, frame in enumerate(video):
             if args.minimal_video_size > min(frame.shape[0], frame.shape[1]):
-                return
+                return chunks_data
             if i % args.sample_rate != 0:
                 continue
             predictions = detector.compute_prediction(frame[:, :, ::-1])
@@ -108,7 +108,7 @@ def process_video(video_path, detector, args):
             criterion = no_person_criterion or camera_criterion
 
             if criterion:
-                video_counter = store(video_path, trajectories, i, args, chunks_data, fps)
+                store(video_path, trajectories, i, args, chunks_data, fps)
                 trajectories = []
 
             ## For each trajectory check the criterion
@@ -147,7 +147,7 @@ def process_video(video_path, detector, args):
 
                 valid_trajectories.append(trajectory)
 
-            video_counter = store(video_path, not_valid_trajectories, i, args, chunks_data, fps)
+            store(video_path, not_valid_trajectories, i, args, chunks_data, fps)
             trajectories = valid_trajectories
 
             ## Assign bbox to trajectories, create new trajectories
@@ -165,7 +165,7 @@ def process_video(video_path, detector, args):
                 if not intersect:
                     trajectories.append([bbox, bbox, i, [frame]])
 
-            if video_counter > args.max_crops:
+            if len(chunks_data) > args.max_crops:
                 break
 
     except IndexError:
@@ -184,7 +184,7 @@ def run(params):
     # manual override some options
     cfg.merge_from_list(["MODEL.DEVICE", "cuda"])
     detector = COCODemo(cfg, min_image_size=256, confidence_threshold=0.7)
-    process_video(os.path.join(args.video_folder, video_file), detector, args)
+    return process_video(os.path.join(args.video_folder, video_file), detector, args)
 
 
 if __name__ == "__main__":

@@ -55,16 +55,18 @@ def estimate_bbox(person_id, video_id, video_path, fa, args):
 
 def store(frame_list, tube_bbox, video_id, person_id, start, end, video_count, chunk_start, args):
     out, final_bbox = crop_bbox_from_frames(frame_list, tube_bbox, min_frames=args.min_frames,
-                                            image_shape=args.image_shape,
-                                            min_size=args.min_size, increase_area=args.increase, max_pad=args.max_pad)
+                                            image_shape=args.image_shape, min_size=args.min_size, 
+                                            increase_area=args.increase, max_pad=args.max_pad)
     if out is None:
         return []
 
-    start += chunk_start * REF_FPS
+    start += round(chunk_start * REF_FPS)
+    end += round(chunk_start * REF_FPS)
     name = (person_id + "#" + video_id + "#" + str(video_count).zfill(3) + ".mp4")
-    imageio.mimsave(os.path.join(args.out_folder, name), out, fps=25)
+    partition = 'test' if person_id in TEST_PERSONS else 'train'
+    imageio.mimsave(os.path.join(args.out_folder, partition, name), out, fps=25)
     return [{'bbox': '-'.join(map(str, final_bbox)), 'start': start, 'end': end, 'fps': REF_FPS,
-             'video_path': video_id, 'height': frame_list[0].shape[0], 'width': frame_list[0].shape[1]}]
+             'video_id': video_id, 'height': frame_list[0].shape[0], 'width': frame_list[0].shape[1]}]
 
 
 def crop_video(person_id, video_id, video_path, args):
@@ -102,10 +104,13 @@ def crop_video(person_id, video_id, video_path, args):
                 frame_list = []
             tube_bbox = join(tube_bbox, bbox)
             frame_list.append(frame)
-    except RuntimeError:
+    except IndexError as e:
         None
+    
+    chunks_data += store(frame_list, tube_bbox, video_id, person_id, start, i, video_count, chunk_start,
+                         args)
 
-    chunks_data += store(frame_list, video_count, tube_bbox, person_id, video_id, utterance)
+    return chunks_data
 
 
 def download(video_id, args):
@@ -157,9 +162,9 @@ def run(params):
     if args.estimate_bbox:
         import face_alignment
         fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False)
-    person_id = 'id' + str(person_id)
     video_folder = os.path.join(args.annotations_folder, person_id)
-
+    
+    chunks_data = []
     for video_id in os.listdir(video_folder):
         intermediate_files = []
         if args.download:
@@ -188,12 +193,16 @@ def run(params):
         if args.crop:
             path = os.path.join(args.chunk_folder, video_id + '*.mp4')
             for chunk in glob.glob(path):
-                crop_video(person_id, video_id, chunk, args)
+                if not os.path.exists(os.path.join(args.bbox_folder, os.path.basename(chunk)[:-4] + '.txt')):
+                   print ("BBox not found %s" % chunk)
+                   continue
+                chunks_data += crop_video(person_id, video_id, chunk, args)
 
         if args.remove_intermediate_results:
             for file in intermediate_files:
                 if os.path.exists(file):
                     os.remove(file)
+    return chunks_data
 
 
 if __name__ == "__main__":
@@ -206,17 +215,21 @@ if __name__ == "__main__":
     parser.add_argument("--min_frames", default=32, type=int, help='Mimimal number of frames')
     parser.add_argument("--max_frames", default=128, type=int, help='Maximal number of frames')
     parser.add_argument("--min_size", default=200, type=int, help='Minimal allowed size')
-    parser.add_argument("--annotations_folder", default='txt1', help='Path to utterance annotations')
+    parser.add_argument("--max_pad", default=0.1, type=int, help='Maximal allowed padding')
+
+    parser.add_argument("--annotations_folder", default='txt', help='Path to utterance annotations')
 
     parser.add_argument("--video_folder", default='videos', help='Path to intermediate videos')
     parser.add_argument("--chunk_folder", default='chunks', help="Path to folder with video chunks")
     parser.add_argument("--bbox_folder", default='bbox', help="Path to folder with bboxes")
     parser.add_argument("--out_folder", default='vox', help='Folder for processed dataset')
+    parser.add_argument("--chunks_metadata", default='vox-metadata.csv', help='File with metadata')
+
+
 
     parser.add_argument("--youtube", default='./youtube-dl', help='Command for launching youtube-dl')
     parser.add_argument("--workers", default=1, type=int, help='Number of parallel workers')
-    parser.add_argument("--device_ids", default="0", type=lambda x: list(x.split(',')),
-                        help="Names of the devices comma separated.")
+    parser.add_argument("--device_ids", default="0", help="Names of the devices comma separated.")
 
     parser.add_argument("--no-download", dest="download", action="store_false", help="Do not download videos")
     parser.add_argument("--no-split-in-utterance", dest="split_in_utterance", action="store_false",
