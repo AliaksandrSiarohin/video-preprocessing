@@ -94,18 +94,25 @@ def process_video(video_path, detector, args):
             if previous_frame is None:
                 previous_frame = rgb2gray(
                     resize(frame, (256, 256), preserve_range=True, anti_aliasing=True, mode='constant'))
+
                 current_frame = previous_frame
+                previous_intensity = np.median(frame.reshape((-1, frame.shape[-1])), axis=0)
+                current_intensity = previous_intensity
             else:
                 current_frame = rgb2gray(
                     resize(frame, (256, 256), preserve_range=True, anti_aliasing=True, mode='constant'))
+                current_intensity = np.median(frame.reshape((-1, frame.shape[-1])), axis=0)
+            print(i, current_intensity)
+
             flow_quantiles = check_camera_motion(current_frame, previous_frame)
             anotations['flow_quantiles'].append(flow_quantiles[np.newaxis])
             camera_criterion = flow_quantiles[1] > args.camera_change_threshold
             previous_frame = current_frame
-
+            intensity_criterion = np.max(np.abs(previous_intensity - current_intensity)) > args.intensity_change_threshold
+            previous_intensity = current_intensity
             no_person_criterion = len(bboxes) < 0
 
-            criterion = no_person_criterion or camera_criterion
+            criterion = no_person_criterion or camera_criterion or intensity_criterion
 
             if criterion:
                 store(video_path, trajectories, i, args, chunks_data, fps)
@@ -203,7 +210,6 @@ if __name__ == "__main__":
     parser.add_argument("--min_size", default=256, type=int, help='Minimal allowed size')
     parser.add_argument("--max_pad", default=0, type=int, help='Minimal allowed padding')
 
-
     parser.add_argument("--out_folder", default="taichi-256", help="Folder with output videos")
     parser.add_argument("--annotation_folder", default="taichi-annotations", help="Folder for annotations")
 
@@ -219,6 +225,7 @@ if __name__ == "__main__":
     parser.add_argument("--minimal_video_size", default=300, type=int, help="Minimal size of the video")
 
     parser.add_argument("--camera_change_threshold", type=float, default=1)
+    parser.add_argument("--intensity_change_threshold", type=float, default=1.5)
     parser.add_argument("--sample_rate", type=int, default=5, help="Sample video rate")
     parser.add_argument("--max_crops", type=int, default=20, help="Maximal number of crops per video.")
     parser.add_argument("--chunks_metadata", default='taichi-metadata.csv', help="File to store metadata for taichi.")
