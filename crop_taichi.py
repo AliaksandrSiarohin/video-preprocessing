@@ -10,7 +10,7 @@ import tqdm
 import numpy as np
 
 from argparse import ArgumentParser
-from util import crop_bbox_from_frames, bb_intersection_over_union, join, compute_aspect_preserved_bbox
+from util import crop_bbox_from_frames, bb_intersection_over_union, join, compute_aspect_preserved_bbox, one_box_inside_other
 import os
 
 import cv2
@@ -33,16 +33,15 @@ def check_camera_motion(current_frame, previous_frame):
 
 
 def store(video_path, trajectories, end, args, chunks_data, fps):
-    for i, (initial_bbox, tube_bbox, start, frame_list) in enumerate(trajectories):
+    for i, (tube_bbox, start, frame_list) in enumerate(trajectories):
         out, final_bbox = crop_bbox_from_frames(frame_list, tube_bbox, min_frames=args.min_frames, image_shape=args.image_shape,
-                                    min_size=args.min_size, increase_area=args.increase, max_pad=args.max_pad)
+                                                min_size=args.min_size, increase_area=0, max_pad=0)
         if len(chunks_data) > args.max_crops:
             return
         if out is None:
             continue
         video_id = os.path.basename(video_path).split('.')[0]
-        name = (video_id + "#" + str(len(chunks_data)).zfill(3) + "#"
-                + str(start).zfill(6) + "#" + str(end).zfill(6) + ".mp4")
+        name = (video_id + "#" + str(start).zfill(6) + "#" + str(end).zfill(6) + ".mp4")
         imageio.mimsave(os.path.join(args.out_folder, name), out, fps=25)
         chunks_data.append({'bbox': '-'.join(map(str, final_bbox)), 'start': start, 'end': end, 'fps': fps,
                             'video_id': video_id, 'height': frame_list[0].shape[0], 'width': frame_list[0].shape[1]})
@@ -85,6 +84,7 @@ def process_video(video_path, detector, args):
             score_criterion = (scores > args.bbox_confidence_th).numpy()
             full_person_criterion = np.array([check_full_person(kps) for kps in keypoint_scores])
 
+
             criterion = np.logical_and(height_criterion, score_criterion)
             bboxes_distractor = bboxes.numpy()[criterion]
             criterion = np.logical_and(full_person_criterion, criterion)
@@ -110,7 +110,6 @@ def process_video(video_path, detector, args):
             intensity_criterion = np.max(np.abs(previous_intensity - current_intensity)) > args.intensity_change_threshold
             previous_intensity = current_intensity
             no_person_criterion = len(bboxes) < 0
-
             criterion = no_person_criterion or camera_criterion or intensity_criterion
 
             if criterion:
@@ -122,7 +121,7 @@ def process_video(video_path, detector, args):
             valid_trajectories = []
 
             for trajectory in trajectories:
-                tube_bbox = compute_aspect_preserved_bbox(trajectory[1], args.increase)
+                tube_bbox = trajectory[0]
                 number_of_intersections = 0
                 current_bbox = None
                 for bbox in bboxes_valid:
@@ -143,11 +142,11 @@ def process_video(video_path, detector, args):
                     not_valid_trajectories.append(trajectory)
                     continue
 
-                if bb_intersection_over_union(trajectory[0], current_bbox) < args.iou_with_initial:
+                if not one_box_inside_other(trajectory[0], current_bbox):
                     not_valid_trajectories.append(trajectory)
                     continue
 
-                if len(trajectory[3]) >= args.max_frames:
+                if len(trajectory[2]) >= args.max_frames:
                     not_valid_trajectories.append(trajectory)
                     continue
 
@@ -160,16 +159,16 @@ def process_video(video_path, detector, args):
             for bbox in bboxes_valid:
                 intersect = False
                 for trajectory in trajectories:
-                    tube_bbox = trajectory[1]
+                    tube_bbox = trajectory[0]
                     intersect = bb_intersection_over_union(tube_bbox, bbox) > 0
                     if intersect:
-                        trajectory[1] = join(tube_bbox, bbox)
-                        trajectory[3].append(frame)
+                        #trajectory[1] = join(tube_bbox, bbox)
+                        trajectory[2].append(frame)
                         break
 
                 ## Create new trajectory
                 if not intersect:
-                    trajectories.append([bbox, bbox, i, [frame]])
+                    trajectories.append([compute_aspect_preserved_bbox(bbox, args.increase), i, [frame]])
 
             if len(chunks_data) > args.max_crops:
                 break
@@ -200,10 +199,9 @@ if __name__ == "__main__":
     parser.add_argument("--device_ids", default="0,1", type=str, help="Device to run video on")
     parser.add_argument("--workers", default=1, type=int, help="Number of workers")
 
-    parser.add_argument("--iou_with_initial", type=float, default=0.25, help="The minimal allowed iou with inital bbox")
     parser.add_argument("--image_shape", default=(256, 256), type=lambda x: tuple(map(int, x.split(','))),
                         help="Image shape")
-    parser.add_argument("--increase", default=0, type=float, help='Increase bbox by this amount')
+    parser.add_argument("--increase", default=0.05, type=float, help='Increase bbox by this amount')
     parser.add_argument("--min_frames", default=32, type=int, help='Mimimal number of frames')
     parser.add_argument("--max_frames", default=128, type=int, help='Maximal number of frames')
     parser.add_argument("--min_size", default=256, type=int, help='Minimal allowed size')
@@ -212,7 +210,7 @@ if __name__ == "__main__":
     parser.add_argument("--out_folder", default="taichi-256", help="Folder with output videos")
     parser.add_argument("--annotation_folder", default="taichi-annotations", help="Folder for annotations")
 
-    parser.add_argument("--bbox_confidence_th", default=0.7, type=float, help="Maskrcnn confidence for bbox")
+    parser.add_argument("--bbox_confidence_th", default=0.9, type=float, help="Maskrcnn confidence for bbox")
     parser.add_argument("--kp_confidence_th", default=2, type=float, help="Maskrcnn confidence for keypoint")
     parser.add_argument("--maskrcnn_config",
                         default="/home/gin/maskrcnn-benchmark/configs/caffe2/e2e_keypoint_rcnn_R_50_FPN_1x_caffe2.yaml",
@@ -225,8 +223,8 @@ if __name__ == "__main__":
 
     parser.add_argument("--camera_change_threshold", type=float, default=1)
     parser.add_argument("--intensity_change_threshold", type=float, default=1.5)
-    parser.add_argument("--sample_rate", type=int, default=5, help="Sample video rate")
-    parser.add_argument("--max_crops", type=int, default=20, help="Maximal number of crops per video.")
+    parser.add_argument("--sample_rate", type=int, default=1, help="Sample video rate")
+    parser.add_argument("--max_crops", type=int, default=1000, help="Maximal number of crops per video.")
     parser.add_argument("--chunks_metadata", default='taichi-metadata.csv', help="File to store metadata for taichi.")
 
     args = parser.parse_args()

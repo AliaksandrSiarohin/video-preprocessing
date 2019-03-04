@@ -15,6 +15,13 @@ def bb_intersection_over_union(boxA, boxB):
     return iou
 
 
+def one_box_inside_other(boxA, boxB):
+    xA = boxA[0] <= boxB[0]
+    yA = boxA[1] <= boxB[1]
+    xB = boxA[2] >= boxB[2]
+    yB = boxA[3] >= boxB[3]
+    return xA and yA and xB and yB
+
 def join(tube_bbox, bbox):
     xA = min(tube_bbox[0], bbox[0])
     yA = min(tube_bbox[1], bbox[1])
