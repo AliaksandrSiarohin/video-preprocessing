@@ -102,7 +102,6 @@ def process_video(video_path, detector, args):
                 current_frame = rgb2gray(
                     resize(frame, (256, 256), preserve_range=True, anti_aliasing=True, mode='constant'))
                 current_intensity = np.median(frame.reshape((-1, frame.shape[-1])), axis=0)
-            print(i, current_intensity)
 
             flow_quantiles = check_camera_motion(current_frame, previous_frame)
             anotations['flow_quantiles'].append(flow_quantiles[np.newaxis])
