@@ -6,7 +6,7 @@ import subprocess
 import warnings
 import glob
 import time
-from util import bb_intersection_over_union, join, scheduler, crop_bbox_from_frames
+from util import bb_intersection_over_union, join, scheduler, crop_bbox_from_frames, save
 from argparse import ArgumentParser
 warnings.filterwarnings("ignore")
 
@@ -53,7 +53,7 @@ def estimate_bbox(person_id, video_id, video_path, fa, args):
     save_bbox_list(video_path, bbox_list)
 
 
-def store(frame_list, tube_bbox, video_id, person_id, start, end, video_count, chunk_start, args):
+def store(frame_list, tube_bbox, video_id, utterance, person_id, start, end, video_count, chunk_start, args):
     out, final_bbox = crop_bbox_from_frames(frame_list, tube_bbox, min_frames=args.min_frames,
                                             image_shape=args.image_shape, min_size=args.min_size, 
                                             increase_area=args.increase, max_pad=args.max_pad)
@@ -62,11 +62,11 @@ def store(frame_list, tube_bbox, video_id, person_id, start, end, video_count, c
 
     start += round(chunk_start * REF_FPS)
     end += round(chunk_start * REF_FPS)
-    name = (person_id + "#" + video_id + "#" + str(video_count).zfill(3) + ".mp4")
+    name = (person_id + "#" + video_id + "#" + utterance + '#' + str(video_count).zfill(3) + ".mp4")
     partition = 'test' if person_id in TEST_PERSONS else 'train'
-    imageio.mimsave(os.path.join(args.out_folder, partition, name), out, fps=25)
+    save(os.path.join(args.out_folder, partition, name), out, args.format)
     return [{'bbox': '-'.join(map(str, final_bbox)), 'start': start, 'end': end, 'fps': REF_FPS,
-             'video_id': video_id, 'height': frame_list[0].shape[0], 'width': frame_list[0].shape[1]}]
+             'video_id': video_id, 'height': frame_list[0].shape[0], 'width': frame_list[0].shape[1], 'partition': partition}]
 
 
 def crop_video(person_id, video_id, video_path, args):
@@ -95,7 +95,7 @@ def crop_video(person_id, video_id, video_path, args):
 
             if bb_intersection_over_union(initial_bbox, bbox) < args.iou_with_initial or len(
                     frame_list) >= args.max_frames:
-                chunks_data += store(frame_list, tube_bbox, video_id, person_id, start, i, video_count, chunk_start,
+                chunks_data += store(frame_list, tube_bbox, video_id, utterance, person_id, start, i, video_count, chunk_start,
                                      args)
                 video_count += 1
                 initial_bbox = bbox
@@ -107,7 +107,7 @@ def crop_video(person_id, video_id, video_path, args):
     except IndexError as e:
         None
     
-    chunks_data += store(frame_list, tube_bbox, video_id, person_id, start, i, video_count, chunk_start,
+    chunks_data += store(frame_list, tube_bbox, video_id, utterance, person_id, start, i + 1, video_count, chunk_start,
                          args)
 
     return chunks_data
@@ -212,17 +212,19 @@ if __name__ == "__main__":
     parser.add_argument("--image_shape", default=(256, 256), type=lambda x: tuple(map(int, x.split(','))),
                         help="Image shape")
     parser.add_argument("--increase", default=0.1, type=float, help='Increase bbox by this amount')
-    parser.add_argument("--min_frames", default=32, type=int, help='Mimimal number of frames')
-    parser.add_argument("--max_frames", default=128, type=int, help='Maximal number of frames')
-    parser.add_argument("--min_size", default=200, type=int, help='Minimal allowed size')
+    parser.add_argument("--min_frames", default=64, type=int, help='Mimimal number of frames')
+    parser.add_argument("--max_frames", default=1024, type=int, help='Maximal number of frames')
+    parser.add_argument("--min_size", default=256, type=int, help='Minimal allowed size')
     parser.add_argument("--max_pad", default=0.1, type=int, help='Maximal allowed padding')
+    parser.add_argument("--format", default='.png', help='Store format (.png, .mp4)')
+
 
     parser.add_argument("--annotations_folder", default='txt', help='Path to utterance annotations')
 
     parser.add_argument("--video_folder", default='videos', help='Path to intermediate videos')
     parser.add_argument("--chunk_folder", default='chunks', help="Path to folder with video chunks")
     parser.add_argument("--bbox_folder", default='bbox', help="Path to folder with bboxes")
-    parser.add_argument("--out_folder", default='vox', help='Folder for processed dataset')
+    parser.add_argument("--out_folder", default='vox-png', help='Folder for processed dataset')
     parser.add_argument("--chunks_metadata", default='vox-metadata.csv', help='File with metadata')
 
 

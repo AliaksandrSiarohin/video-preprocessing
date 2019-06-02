@@ -79,13 +79,6 @@ def store(frame_list, tube_bbox, video_id):
     imageio.mimsave(os.path.join(args.out_folder, partition, video_id), out)
 
 
-def draw_kp(image, kp_array):
-    from skimage.draw import circle
-    for kp_ind, kp in enumerate(kp_array):
-        rr, cc = circle(kp[1], kp[0], 5, shape=image.shape[:2])
-        image[rr, cc] = (255, 255, 255)
-    return image
-
 def process_video(video_id):
     video_path = os.path.join(args.in_folder, video_id)
     reader = imageio.get_reader(video_path)

@@ -42,21 +42,14 @@ def store(video_path, trajectories, end, args, chunks_data, fps):
             continue
         video_id = os.path.basename(video_path).split('.')[0]
         name = (video_id + "#" + str(start).zfill(6) + "#" + str(end).zfill(6) + ".mp4")
-        imageio.mimsave(os.path.join(args.out_folder, name), out, fps=25)
-        chunks_data.append({'bbox': '-'.join(map(str, final_bbox)), 'start': start, 'end': end, 'fps': fps,
+        partition = 'test' if video_id in test_videos else 'train'
+        chunks_data.append({'bbox': '-'.join(map(str, final_bbox)), 'start': start, 'end': end, 'fps': fps, 'partition': partition,
                             'video_id': video_id, 'height': frame_list[0].shape[0], 'width': frame_list[0].shape[1]})
 
 
 def process_video(video_path, detector, args):
     video = imageio.get_reader(video_path)
     fps = video.get_meta_data()['fps']
-    anotations = {"keypoints": [],
-                  "scores": [],
-                  "keypoint_scores": [],
-                  "bbox": [],
-                  "flow_quantiles": [],
-                  "indexes": []}
-
     trajectories = []
     previous_frame = None
     chunks_data = []
@@ -72,18 +65,11 @@ def process_video(video_path, detector, args):
             keypoint_scores = predictions.get_field('keypoints').get_field("logits")
             bboxes = predictions.bbox[:, :4]
 
-            anotations['keypoints'].append(keypoints.numpy())
-            anotations['scores'].append(scores.numpy())
-            anotations['keypoint_scores'].append(keypoint_scores.numpy())
-            anotations['bbox'].append(bboxes.numpy())
-            anotations['indexes'].append(i)
-
             ## Check if valid person in bbox
 
             height_criterion = ((bboxes[:, 3] - bboxes[:, 1]) > args.mimial_person_size * frame.shape[1]).numpy()
             score_criterion = (scores > args.bbox_confidence_th).numpy()
             full_person_criterion = np.array([check_full_person(kps) for kps in keypoint_scores])
-
 
             criterion = np.logical_and(height_criterion, score_criterion)
             bboxes_distractor = bboxes.numpy()[criterion]
@@ -104,7 +90,6 @@ def process_video(video_path, detector, args):
                 current_intensity = np.median(frame.reshape((-1, frame.shape[-1])), axis=0)
 
             flow_quantiles = check_camera_motion(current_frame, previous_frame)
-            anotations['flow_quantiles'].append(flow_quantiles[np.newaxis])
             camera_criterion = flow_quantiles[1] > args.camera_change_threshold
             previous_frame = current_frame
             intensity_criterion = np.max(np.abs(previous_intensity - current_intensity)) > args.intensity_change_threshold
@@ -176,8 +161,6 @@ def process_video(video_path, detector, args):
     except IndexError:
         None
 
-    anotations = {k: np.array(v) for k, v in anotations.items()}
-    np.savez(os.path.join(args.annotation_folder, os.path.basename(video_path)[:-3] + 'npz'), **anotations)
     store(video_path, trajectories, i + 1, args, chunks_data, fps)
     return chunks_data
 
@@ -199,11 +182,11 @@ if __name__ == "__main__":
     parser.add_argument("--device_ids", default="0,1", type=str, help="Device to run video on")
     parser.add_argument("--workers", default=1, type=int, help="Number of workers")
 
-    parser.add_argument("--image_shape", default=(256, 256), type=lambda x: tuple(map(int, x.split(','))),
-                        help="Image shape")
+    parser.add_argument("--image_shape", default=None, type=lambda x: tuple(map(int, x.split(','))),
+                        help="Image shape, None - for no resize")
     parser.add_argument("--increase", default=0.05, type=float, help='Increase bbox by this amount')
-    parser.add_argument("--min_frames", default=32, type=int, help='Mimimal number of frames')
-    parser.add_argument("--max_frames", default=128, type=int, help='Maximal number of frames')
+    parser.add_argument("--min_frames", default=128, type=int, help='Mimimal number of frames')
+    parser.add_argument("--max_frames", default=1024, type=int, help='Maximal number of frames')
     parser.add_argument("--min_size", default=256, type=int, help='Minimal allowed size')
     parser.add_argument("--max_pad", default=0, type=int, help='Minimal allowed padding')
 
