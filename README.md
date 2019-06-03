@@ -1,4 +1,4 @@
-# Loading vox-celeb dataset
+# Preprocessing vox-celeb dataset
 1) Load vox-celeb1(vox-celeb2) annotations:
 
 ```
@@ -32,8 +32,13 @@ cd face-alignment
 pip install -r requirements.txt
 python setup.py install
 ```
+4) Install ffmpeg
 
-4) Run preprocessing (assuming 8 gpu, and 5 workers per gpu).
+```
+sudo apt-get install ffmpeg
+```
+
+5) Run preprocessing (assuming 8 gpu, and 5 workers per gpu).
 ```
 python crop_vox.py --workers 40 --device_ids 0,1,2,3,4,5,6,7 
 ```
