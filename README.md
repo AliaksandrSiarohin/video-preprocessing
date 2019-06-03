@@ -40,5 +40,5 @@ sudo apt-get install ffmpeg
 
 5) Run preprocessing (assuming 8 gpu, and 5 workers per gpu).
 ```
-python crop_vox.py --workers 40 --device_ids 0,1,2,3,4,5,6,7 
+python crop_vox.py --workers 40 --device_ids 0,1,2,3,4,5,6,7 --format .mp4
 ```
