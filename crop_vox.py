@@ -61,7 +61,7 @@ def store(frame_list, tube_bbox, video_id, utterance, person_id, start, end, vid
                                             increase_area=args.increase, max_pad=args.max_pad)
     if out is None:
         return []
-    print (len(frame_list))
+
     start += round(chunk_start * REF_FPS)
     end += round(chunk_start * REF_FPS)
     name = (person_id + "#" + video_id + "#" + utterance + '#' + str(video_count).zfill(3) + ".mp4")
