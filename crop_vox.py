@@ -11,7 +11,6 @@ from argparse import ArgumentParser
 warnings.filterwarnings("ignore")
 
 DEVNULL = open(os.devnull, 'wb')
-TEST_PERSONS = ['id' + str(i) for i in range(10270, 10310)]
 REF_FRAME_SIZE = 360
 REF_FPS = 25
 
@@ -43,8 +42,11 @@ def estimate_bbox(person_id, video_id, video_path, fa, args):
             if i >= len(frames):
                 break
             val = d.iloc[i]
-            mult = frame.shape[0] / REF_FRAME_SIZE
-            x, y, w, h = val['X '] * mult, val['Y '] * mult, val['W '] * mult, val['H '] * mult
+            if args.dataset_version == 1:
+                mult = frame.shape[0] / REF_FRAME_SIZE
+                x, y, w, h = val['X '] * mult, val['Y '] * mult, val['W '] * mult, val['H '] * mult
+            else:
+                x, y, w, h = val['X '] *  frame.shape[1], val['Y '] *  frame.shape[0], val['W '] *  frame.shape[1], val['H '] *  frame.shape[0]
             bbox = extract_bbox(frame, (x, y, x + w, y + h), fa)
             bbox_list.append(bbox)
     except IndexError:
@@ -59,7 +61,7 @@ def store(frame_list, tube_bbox, video_id, utterance, person_id, start, end, vid
                                             increase_area=args.increase, max_pad=args.max_pad)
     if out is None:
         return []
-
+    print (len(frame_list))
     start += round(chunk_start * REF_FPS)
     end += round(chunk_start * REF_FPS)
     name = (person_id + "#" + video_id + "#" + utterance + '#' + str(video_count).zfill(3) + ".mp4")
@@ -208,6 +210,8 @@ def run(params):
 if __name__ == "__main__":
     parser = ArgumentParser()
 
+    parser.add_argument("--dataset_version", default=1, type=int, choices=[1, 2], help='Version of Vox celeb dataset 1 or 2')
+
     parser.add_argument("--iou_with_initial", type=float, default=0.25, help="The minimal allowed iou with inital bbox")
     parser.add_argument("--image_shape", default=(256, 256), type=lambda x: tuple(map(int, x.split(','))),
                         help="Image shape")
@@ -218,7 +222,6 @@ if __name__ == "__main__":
     parser.add_argument("--max_pad", default=0.1, type=int, help='Maximal allowed padding')
     parser.add_argument("--format", default='.png', help='Store format (.png, .mp4)')
 
-
     parser.add_argument("--annotations_folder", default='txt', help='Path to utterance annotations')
 
     parser.add_argument("--video_folder", default='videos', help='Path to intermediate videos')
@@ -226,8 +229,6 @@ if __name__ == "__main__":
     parser.add_argument("--bbox_folder", default='bbox', help="Path to folder with bboxes")
     parser.add_argument("--out_folder", default='vox-png', help='Folder for processed dataset')
     parser.add_argument("--chunks_metadata", default='vox-metadata.csv', help='File with metadata')
-
-
 
     parser.add_argument("--youtube", default='./youtube-dl', help='Command for launching youtube-dl')
     parser.add_argument("--workers", default=1, type=int, help='Number of parallel workers')
@@ -250,6 +251,23 @@ if __name__ == "__main__":
     parser.set_defaults(remove_intermediate_results=False)
 
     args = parser.parse_args()
+
+    if args.dataset_version == 1:
+        TEST_PERSONS = ['id' + str(i) for i in range(10270, 10310)]
+    else:
+        TEST_PERSONS = ['id07874', 'id00017', 'id00081', 'id09017', 'id08374', 'id04276', 'id03862', 'id00817', 'id00154',
+                        'id02317', 'id06484', 'id07312', 'id03041', 'id05124', 'id03980', 'id05459', 'id04627', 'id08548',
+                        'id01333', 'id02725', 'id05999', 'id06310', 'id08149', 'id04094', 'id08392', 'id02577', 'id01460',
+                        'id02057', 'id08701', 'id00812', 'id00926', 'id03839', 'id06104', 'id07426', 'id08552', 'id01567',
+                        'id03382', 'id02286', 'id03347', 'id08456', 'id02745', 'id00061', 'id01066', 'id03969', 'id06913',
+                        'id01228', 'id02086', 'id08911', 'id01298', 'id06811', 'id07961', 'id04536', 'id01509', 'id01892',
+                        'id08696', 'id06692', 'id01593', 'id01000', 'id01618', 'id04253', 'id04657', 'id04656', 'id03030',
+                        'id01437', 'id02548', 'id01106', 'id04570', 'id05176', 'id05816', 'id00562', 'id02181', 'id07802',
+                        'id03978', 'id04030', 'id03789', 'id04295', 'id00866', 'id07868', 'id04119', 'id01989', 'id07414',
+                        'id01041', 'id03178', 'id04232', 'id03127', 'id06209', 'id03677', 'id04006', 'id05850', 'id02576',
+                        'id05594', 'id01541', 'id05055', 'id07354', 'id01224', 'id03524', 'id02445', 'id07663', 'id05015',
+                        'id07494', 'id04950', 'id04478', 'id02685', 'id02542', 'id05714', 'id02465', 'id05654', 'id05202',
+                        'id00419', 'id03981', 'id04366', 'id07396', 'id02019', 'id01822', 'id06816', 'id07621', 'id07620', 'id04862']
 
     if not os.path.exists(args.video_folder):
         os.makedirs(args.video_folder)
