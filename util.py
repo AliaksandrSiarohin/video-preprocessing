@@ -60,7 +60,7 @@ def compute_increased_bbox(bbox, increase_area):
 
 
 def crop_bbox_from_frames(frame_list, tube_bbox, min_frames=16, image_shape=(256, 256), min_size=200,
-                          increase_area=0.1, max_pad=10, aspect_preserving=False):
+                          increase_area=0.1, max_pad=10, aspect_preserving=True):
     frame_shape = frame_list[0].shape
     # Filter short sequences
     if len(frame_list) < min_frames:
