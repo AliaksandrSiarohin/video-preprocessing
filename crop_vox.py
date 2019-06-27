@@ -61,14 +61,15 @@ def store(frame_list, tube_bbox, video_id, utterance, person_id, start, end, vid
                                             increase_area=args.increase, max_pad=args.max_pad)
     if out is None:
         return []
-    print (len(frame_list))
+
     start += round(chunk_start * REF_FPS)
     end += round(chunk_start * REF_FPS)
     name = (person_id + "#" + video_id + "#" + utterance + '#' + str(video_count).zfill(3) + ".mp4")
     partition = 'test' if person_id in TEST_PERSONS else 'train'
     save(os.path.join(args.out_folder, partition, name), out, args.format)
     return [{'bbox': '-'.join(map(str, final_bbox)), 'start': start, 'end': end, 'fps': REF_FPS,
-             'video_id': video_id, 'height': frame_list[0].shape[0], 'width': frame_list[0].shape[1], 'partition': partition}]
+             'video_id': '#'.join([video_id, person_id]), 'height': frame_list[0].shape[0], 
+             'width': frame_list[0].shape[1], 'partition': partition}]
 
 
 def crop_video(person_id, video_id, video_path, args):
@@ -219,7 +220,7 @@ if __name__ == "__main__":
     parser.add_argument("--min_frames", default=64, type=int, help='Mimimal number of frames')
     parser.add_argument("--max_frames", default=1024, type=int, help='Maximal number of frames')
     parser.add_argument("--min_size", default=256, type=int, help='Minimal allowed size')
-    parser.add_argument("--max_pad", default=0.1, type=int, help='Maximal allowed padding')
+    parser.add_argument("--max_pad", default=0, type=int, help='Maximal allowed padding')
     parser.add_argument("--format", default='.png', help='Store format (.png, .mp4)')
 
     parser.add_argument("--annotations_folder", default='txt', help='Path to utterance annotations')
