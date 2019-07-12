@@ -17,7 +17,10 @@ REF_FPS = 25
 
 def extract_bbox(frame, refbbox, fa):
     bboxes = fa.face_detector.detect_from_image(frame[..., ::-1])
-    bbox = max([(bb_intersection_over_union(bbox, refbbox), tuple(bbox)) for bbox in bboxes])[1]
+    if len(bboxes) != 0:
+        bbox = max([(bb_intersection_over_union(bbox, refbbox), tuple(bbox)) for bbox in bboxes])[1]
+    else:
+        bbox = np.array([0, 0, 0, 0, 0])
     return np.maximum(np.array(bbox), 0)
 
 
