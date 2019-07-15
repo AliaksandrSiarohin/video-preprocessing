@@ -8,6 +8,7 @@ import glob
 import time
 from util import bb_intersection_over_union, join, scheduler, crop_bbox_from_frames, save
 from argparse import ArgumentParser
+from skimage.transform import resize
 warnings.filterwarnings("ignore")
 
 DEVNULL = open(os.devnull, 'wb')
@@ -45,13 +46,15 @@ def estimate_bbox(person_id, video_id, video_path, fa, args):
             if i >= len(frames):
                 break
             val = d.iloc[i]
+            mult = frame.shape[0] / REF_FRAME_SIZE
+            frame = resize(frame, (REF_FRAME_SIZE, int(frame.shape[1] / mult)), preserve_range=True)
+ 
             if args.dataset_version == 1:
-                mult = frame.shape[0] / REF_FRAME_SIZE
-                x, y, w, h = val['X '] * mult, val['Y '] * mult, val['W '] * mult, val['H '] * mult
+                x, y, w, h = val['X '], val['Y '], val['W '], val['H ']
             else:
-                x, y, w, h = val['X '] *  frame.shape[1], val['Y '] *  frame.shape[0], val['W '] *  frame.shape[1], val['H '] *  frame.shape[0]
+                x, y, w, h = val['X '] *  frame.shape[1], val['Y '] * frame.shape[0], val['W '] * frame.shape[1], val['H '] * frame.shape[0]
             bbox = extract_bbox(frame, (x, y, x + w, y + h), fa)
-            bbox_list.append(bbox)
+            bbox_list.append(bbox * mult)
     except IndexError:
         None
 
@@ -173,41 +176,44 @@ def run(params):
     chunks_data = []
     for video_id in os.listdir(video_folder):
         intermediate_files = []
-        if args.download:
-            video_path = download(video_id, args)
-            intermediate_files.append(video_path)
+        try:
+            if args.download:
+                video_path = download(video_id, args)
+                intermediate_files.append(video_path)
 
-        if args.split_in_utterance:
-            chunk_names = split_in_utterance(person_id, video_id, args)
-            intermediate_files += chunk_names
+            if args.split_in_utterance:
+                chunk_names = split_in_utterance(person_id, video_id, args)
+                intermediate_files += chunk_names
 
-        if args.estimate_bbox:
-            path = os.path.join(args.chunk_folder, video_id + '*.mp4')
-            for chunk in glob.glob(path):
-                while True:
-                    try:
-                        estimate_bbox(person_id, video_id, chunk, fa, args)
-                        break
-                    except RuntimeError as e:
-                        if str(e).startswith('CUDA'):
-                            print("Warning: out of memory, sleep for 1s")
-                            time.sleep(1)
-                        else:
-                            print(e)
+            if args.estimate_bbox:
+                path = os.path.join(args.chunk_folder, video_id + '*.mp4')
+                for chunk in glob.glob(path):
+                    while True:
+                        try:
+                            estimate_bbox(person_id, video_id, chunk, fa, args)
                             break
+                        except RuntimeError as e:
+                            if str(e).startswith('CUDA'):
+                                print("Warning: out of memory, sleep for 1s")
+                                time.sleep(1)
+                            else:
+                                print(e)
+                                break
 
-        if args.crop:
-            path = os.path.join(args.chunk_folder, video_id + '*.mp4')
-            for chunk in glob.glob(path):
-                if not os.path.exists(os.path.join(args.bbox_folder, os.path.basename(chunk)[:-4] + '.txt')):
-                   print ("BBox not found %s" % chunk)
-                   continue
-                chunks_data += crop_video(person_id, video_id, chunk, args)
+            if args.crop:
+                path = os.path.join(args.chunk_folder, video_id + '*.mp4')
+                for chunk in glob.glob(path):
+                    if not os.path.exists(os.path.join(args.bbox_folder, os.path.basename(chunk)[:-4] + '.txt')):
+                       print ("BBox not found %s" % chunk)
+                       continue
+                    chunks_data += crop_video(person_id, video_id, chunk, args)
 
-        if args.remove_intermediate_results:
-            for file in intermediate_files:
-                if os.path.exists(file):
-                    os.remove(file)
+            if args.remove_intermediate_results:
+                for file in intermediate_files:
+                    if os.path.exists(file):
+                        os.remove(file)
+        except Exception as e:
+            print (e)
     return chunks_data
 
 
@@ -237,6 +243,9 @@ if __name__ == "__main__":
     parser.add_argument("--youtube", default='./youtube-dl', help='Command for launching youtube-dl')
     parser.add_argument("--workers", default=1, type=int, help='Number of parallel workers')
     parser.add_argument("--device_ids", default="0", help="Names of the devices comma separated.")
+
+    parser.add_argument("--data_range", default=(0, 10000), type=lambda x: tuple(map(int, x.split('-'))), help="Range of ids for processing")
+ 
 
     parser.add_argument("--no-download", dest="download", action="store_false", help="Do not download videos")
     parser.add_argument("--no-split-in-utterance", dest="split_in_utterance", action="store_false",
@@ -285,5 +294,7 @@ if __name__ == "__main__":
         if not os.path.exists(os.path.join(args.out_folder, partition)):
             os.makedirs(os.path.join(args.out_folder, partition))
 
-    ids = sorted(os.listdir(args.annotations_folder))
+    ids = set(os.listdir(args.annotations_folder))
+    ids_range = {'id' + str(num).zfill(5) for num in range(args.data_range[0], args.data_range[1])}
+    ids = sorted(list(ids.intersection(ids_range)))
     scheduler(ids, run, args)
