@@ -29,7 +29,7 @@ def extract_bbox(frame, fa):
 def store(frame_list, tube_bbox, video_id, args):
     out, final_bbox = crop_bbox_from_frames(frame_list, tube_bbox, min_frames=0,
                                             image_shape=args.image_shape, min_size=0, 
-                                            increase_area=args.increase, max_pad=100000)
+                                            increase_area=args.increase)
     if out is None:
         return []
 

@@ -60,7 +60,7 @@ def compute_increased_bbox(bbox, increase_area):
 
 
 def crop_bbox_from_frames(frame_list, tube_bbox, min_frames=16, image_shape=(256, 256), min_size=200,
-                          increase_area=0.1, max_pad=10, aspect_preserving=True):
+                          increase_area=0.1, aspect_preserving=True):
     frame_shape = frame_list[0].shape
     # Filter short sequences
     if len(frame_list) < min_frames:
@@ -83,13 +83,8 @@ def crop_bbox_from_frames(frame_list, tube_bbox, min_frames=16, image_shape=(256
     top_oob = -min(0, top)
     bot_oob = bot - min(bot, frame_shape[0])
     
-    left += left_oob
-    right += left_oob
-    top += top_oob
-    bot += top_oob
-
     #Not use near the border
-    if max(left_oob / float(width), right_oob / float(width), top_oob  / float(height), bot_oob / float(height)) > max_pad:
+    if max(left_oob / float(width), right_oob / float(width), top_oob  / float(height), bot_oob / float(height)) > 0:
         return [None, None]
 
     selected = [frame[top:bot, left:right] for frame in frame_list]

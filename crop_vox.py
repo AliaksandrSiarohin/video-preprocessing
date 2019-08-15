@@ -64,7 +64,7 @@ def estimate_bbox(person_id, video_id, video_path, fa, args):
 def store(frame_list, tube_bbox, video_id, utterance, person_id, start, end, video_count, chunk_start, args):
     out, final_bbox = crop_bbox_from_frames(frame_list, tube_bbox, min_frames=args.min_frames,
                                             image_shape=args.image_shape, min_size=args.min_size, 
-                                            increase_area=args.increase, max_pad=args.max_pad)
+                                            increase_area=args.increase)
     if out is None:
         return []
 
@@ -229,7 +229,6 @@ if __name__ == "__main__":
     parser.add_argument("--min_frames", default=64, type=int, help='Mimimal number of frames')
     parser.add_argument("--max_frames", default=1024, type=int, help='Maximal number of frames')
     parser.add_argument("--min_size", default=256, type=int, help='Minimal allowed size')
-    parser.add_argument("--max_pad", default=0, type=int, help='Maximal allowed padding')
     parser.add_argument("--format", default='.png', help='Store format (.png, .mp4)')
 
     parser.add_argument("--annotations_folder", default='txt', help='Path to utterance annotations')
