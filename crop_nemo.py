@@ -47,13 +47,11 @@ def process_video(video_id, args):
     tube_bbox = None
     frame_list = []
     for i, frame in enumerate(reader):
-        bbox = extract_bbox(resize(frame, (360, 640), preserve_range=True), fa)
-        bbox = bbox * 3
-        left, top, right, bot, _ = bbox
-
-        if tube_bbox is None:
-           tube_bbox = bbox
-        tube_bbox = join(tube_bbox, bbox)
+        if i == 0:
+            bbox = extract_bbox(resize(frame, (360, 640), preserve_range=True), fa)
+            bbox = bbox * 3
+            #left, top, right, bot, _ = bbox
+            tube_bbox = bbox[:-1]
         frame_list.append(frame)
     return store(frame_list, tube_bbox, video_id, args)
 
