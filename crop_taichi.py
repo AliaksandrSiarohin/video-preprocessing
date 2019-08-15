@@ -35,7 +35,7 @@ def check_camera_motion(current_frame, previous_frame):
 def store(video_path, trajectories, end, args, chunks_data, fps):
     for i, (tube_bbox, start, frame_list) in enumerate(trajectories):
         out, final_bbox = crop_bbox_from_frames(frame_list, tube_bbox, min_frames=args.min_frames, image_shape=args.image_shape,
-                                                min_size=args.min_size, increase_area=0, max_pad=0)
+                                                min_size=args.min_size, increase_area=0)
         if len(chunks_data) > args.max_crops:
             return
         if out is None:
@@ -188,7 +188,6 @@ if __name__ == "__main__":
     parser.add_argument("--min_frames", default=128, type=int, help='Mimimal number of frames')
     parser.add_argument("--max_frames", default=1024, type=int, help='Maximal number of frames')
     parser.add_argument("--min_size", default=256, type=int, help='Minimal allowed size')
-    parser.add_argument("--max_pad", default=0, type=int, help='Minimal allowed padding')
 
     parser.add_argument("--out_folder", default="taichi-256", help="Folder with output videos")
     parser.add_argument("--annotation_folder", default="taichi-annotations", help="Folder for annotations")
