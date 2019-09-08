@@ -1,6 +1,11 @@
 # Video Preprocessing 
 This repository provides tools for preprocessing videos for TaiChi, VoxCeleb and UvaNemo dataset used in [paper]().
 
+# Downloading
+VoxCeleb with our preprocessing can be download in [.mp4](https://yadi.sk/d/6XkWUoJzjzuwVA) format and in [.png](). 
+
+TaiChi can be downloade directly in format [.mp4](https://yadi.sk/d/03C366987mkS1w) or [.png](https://drive.google.com/file/d/10b_OiRxMKRgbrOQHQvM-OEISPWfiM7zY/view?usp=sharing).
+
 ## Dowloading videos and cropping according to precomputed bounding boxes
 1) Instal requirments:
 ```
@@ -127,5 +132,11 @@ python crop_nemo.py --in_folder /path/to/videos --out_folder nemo --device_ids 0
 Citation:
 
 ```
-
+@InProceedings{Siarohin_2019_NeurIPS,
+  author={Siarohin, Aliaksandr and Lathuilière, Stéphane and Tulyakov, Sergey and Ricci, Elisa and Sebe, Nicu},
+  title={First Order Motion Model for Image Animation},
+  booktitle = {Conference on Neural Information Processing Systems (NeurIPS)},
+  month = {December},
+  year = {2019}
+}
 ```
