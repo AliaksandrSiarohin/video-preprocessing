@@ -75,7 +75,7 @@ if __name__ == "__main__":
     parser.add_argument("--out_folder", default='taichi-png', help='Path to output')
     parser.add_argument("--format", default='.png', help='Storing format')
     parser.add_argument("--workers", default=1, type=int, help='Number of workers')
-    parser.add_argument("--youtube", default='./youtube', help='Path to youtube-dl')
+    parser.add_argument("--youtube", default='./youtube-dl', help='Path to youtube-dl')
  
     parser.add_argument("--image_shape", default=(256, 256), type=lambda x: tuple(map(int, x.split(','))),
                         help="Image shape, None for no resize")
