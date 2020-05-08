@@ -63,7 +63,11 @@ def run(data):
         None
 
     for entry in all_chunks_dict:
-        first_part = '#'.join(video_id.split('#')[::-1])
+        if 'person_id' in df:
+            first_part = df['person_id'].iloc[0] + "#"
+        else:
+            first_part = ""
+        first_part = first_part + '#'.join(video_id.split('#')[::-1])
         path = first_part + '#' + str(entry['start']).zfill(6) + '#' + str(entry['end']).zfill(6) + '.mp4'
         save(os.path.join(args.out_folder, partition, path), entry['frames'], args.format)
 
