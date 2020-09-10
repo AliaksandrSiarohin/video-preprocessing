@@ -26,8 +26,7 @@ chmod a+rx youtube-dl
 ```
 python load_videos.py --metadata taichi-metadata.csv --format .mp4 --out_folder taichi --workers 8
 ```
-select number of workers based on number of cpu avaliable. Note .png format take aproximatly 80GB.
-
+select number of workers based on number of cpu avaliable. Note .png format take approximatly 80GB.
 
 **VoxCeleb**
 ```
