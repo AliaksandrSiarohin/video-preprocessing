@@ -26,20 +26,20 @@ chmod a+rx youtube-dl
 ```
 python load_videos.py --metadata taichi-metadata.csv --format .mp4 --out_folder taichi --workers 8
 ```
-select number of workers based on number of cpu avaliable. Note .png format take approximatly 80GB.
+select number of workers based on number of cpu avaliable. Note .png format take approximately 80GB.
 
 **VoxCeleb**
 ```
 python load_videos.py --metadata vox-metadata.csv --format .mp4 --out_folder vox --workers 8
 ```
-Note .png format take aproximatly 300GB.
+Note .png format take approximately 300GB.
 
 **UvaNemo**
 Since videos is not avaliable on youtube you have to download videos from official [website](https://www.uva-nemo.org/), and run:
 ```
 python load_videos.py --metadata nemo-metadata.csv --format .mp4 --out_folder nemo --workers 8 --video_folder path/to/original/videos
 ```
-Note .png format take aproximatly 18GB.
+Note .png format take approximately 18GB.
 
 ## Preprocessing VoxCeleb dataset
 
