@@ -2,7 +2,7 @@ certifi==2018.11.29
 chardet==3.0.4
 cloudpickle==0.6.1
 cycler==0.10.0
-dask==1.1.0
+dask==2021.10.0
 decorator==4.3.0
 ffmpeg-python==0.1.18
 future==0.17.1
